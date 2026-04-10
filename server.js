@@ -10,10 +10,12 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Necesario para que Railway/proxies pasen las cookies correctamente
+app.set('trust proxy', 1);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Sesiones ANTES de servir archivos
 app.use(session({
   store: new PgSession({ pool, tableName: 'session' }),
   secret: process.env.SESSION_SECRET || 'aserradero-secret-2024-cambiar',
@@ -22,38 +24,31 @@ app.use(session({
   cookie: {
     maxAge: 7 * 24 * 60 * 60 * 1000,
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production'
+    secure: 'auto',   // auto = true en HTTPS, false en HTTP
+    sameSite: 'lax'
   }
 }));
 
-// Rutas auth (login, logout, registro)
 app.use('/', authRoutes);
-
-// API protegida
 app.use('/api', apiRoutes);
 
-// Página principal — requiere login
 app.get('/', (req, res) => {
   if (!req.session.userId) return res.redirect('/login');
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Admin
 app.get('/admin/usuarios', (req, res) => {
   if (!req.session.userId || req.session.userRol !== 'admin') return res.redirect('/');
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
-// Bloquear acceso directo a index.html
 app.get('/index.html', (req, res) => {
   if (!req.session.userId) return res.redirect('/login');
   res.redirect('/');
 });
 
-// Archivos estáticos al final
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Cualquier otra ruta sin login → login
 app.use((req, res) => {
   if (!req.session.userId) return res.redirect('/login');
   res.redirect('/');
