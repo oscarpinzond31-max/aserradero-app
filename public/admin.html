@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Aserradero — Admin Usuarios</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@400;600&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:#F5F2EC;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.card{background:#fff;border:1px solid #D5D0C6;border-radius:12px;padding:32px;width:100%;max-width:600px}
+h1{font-family:'Fraunces',serif;font-size:20px;font-weight:600;margin-bottom:4px}
+.sub{font-size:13px;color:#9C9890;margin-bottom:24px}
+.btn{padding:8px 16px;border-radius:6px;border:1px solid #BEB9AE;background:#fff;color:#1A1814;cursor:pointer;font-size:13px;font-family:'DM Sans',sans-serif;font-weight:500}
+.btn:hover{background:#EDEAE2}
+.btn-primary{background:#2D5A3D;color:#fff;border-color:#2D5A3D}
+.btn-primary:hover{background:#4A8C61}
+.actions{display:flex;gap:10px;margin-bottom:20px}
+a{color:#2D5A3D;text-decoration:none;font-size:13px}
+a:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Gestión de Usuarios</h1>
+  <div class="sub">Panel de administración</div>
+  <div class="actions">
+    <button class="btn btn-primary" onclick="window.location='/registro'">+ Crear nuevo usuario</button>
+    <button class="btn" onclick="window.location='/'">← Volver al sistema</button>
+  </div>
+  <p style="font-size:13px;color:#5C5850">Para gestionar usuarios directamente, ve a <strong>Usuarios</strong> en el menú lateral del sistema principal.</p>
+</div>
+</body>
+</html>
