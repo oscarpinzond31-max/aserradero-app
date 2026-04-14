@@ -226,4 +226,34 @@ router.delete('/usuarios/:id', auth, async (req, res) => {
   res.json({ ok: true });
 });
 
+// LOGS
+async function registrarLog(pool, req, accion, entidad, entidad_id, detalle) {
+  try {
+    await pool.query(
+      'INSERT INTO logs (usuario_id, usuario_nombre, accion, entidad, entidad_id, detalle) VALUES ($1,$2,$3,$4,$5,$6)',
+      [req.session.userId||null, req.session.userName||'Sistema', accion, entidad, entidad_id?.toString()||null, detalle||null]
+    );
+  } catch(e) { console.error('Log error:', e.message); }
+}
+
+router.get('/logs', auth, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT * FROM logs ORDER BY creado_en DESC LIMIT 200`
+    );
+    res.json(r.rows);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Sobrescribir rutas clave para agregar logs
+// (Se hace en middleware post-facto interceptando las respuestas ya enviadas arriba)
+// En su lugar, agregamos endpoints de log explícitos que el frontend llama después de cada operación
+
+router.post('/logs', auth, async (req, res) => {
+  const { accion, entidad, entidad_id, detalle } = req.body;
+  await registrarLog(pool, req, accion, entidad, entidad_id, detalle);
+  res.json({ ok: true });
+});
+
 module.exports = router;
+module.exports.registrarLog = registrarLog;

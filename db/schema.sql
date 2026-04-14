@@ -114,3 +114,15 @@ DO $$ BEGIN
     );
   END IF;
 END $$;
+
+-- Tabla de logs de actividad
+CREATE TABLE IF NOT EXISTS logs (
+  id SERIAL PRIMARY KEY,
+  usuario_id INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+  usuario_nombre TEXT,
+  accion TEXT NOT NULL,
+  entidad TEXT NOT NULL,
+  entidad_id TEXT,
+  detalle TEXT,
+  creado_en TIMESTAMPTZ DEFAULT NOW()
+);

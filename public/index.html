@@ -117,6 +117,7 @@ tr:hover td{background:var(--bg)}
   <nav class="nav-section">
     <div class="nav-label">Contabilidad</div>
     <div class="nav-item" data-page="iva" onclick="navigate('iva')">% Resumen IVA</div>
+    <div class="nav-item" data-page="logs" onclick="navigate('logs')">🕒 Actividad</div>
   </nav>
   <div id="admin-nav" style="display:none">
     <nav class="nav-section">
@@ -201,7 +202,7 @@ tr:hover td{background:var(--bg)}
       </div>
       <div class="stats-grid" id="gastos-stats" style="grid-template-columns:repeat(3,1fr);margin-bottom:18px"></div>
       <div class="card"><div class="table-wrap"><table>
-        <thead><tr><th>Fecha</th><th>Categoría</th><th>Descripción</th><th class="text-right">Subtotal</th><th class="text-right">IVA</th><th class="text-right">Total</th><th>Estado</th><th></th></tr></thead>
+        <thead><tr><th>Fecha</th><th>Categoría</th><th>Descripción</th><th class="text-right">Subtotal</th><th class="text-right">IVA</th><th class="text-right">Total</th><th class="text-right">Abonado</th><th class="text-right">Saldo</th><th>Estado</th><th></th></tr></thead>
         <tbody id="tabla-gastos"></tbody>
       </table></div></div>
     </div>
@@ -250,6 +251,30 @@ tr:hover td{background:var(--bg)}
       <div class="card"><div class="table-wrap"><table>
         <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Creado</th><th></th></tr></thead>
         <tbody id="tabla-usuarios"></tbody>
+      </table></div></div>
+    </div>
+
+    <!-- LOGS -->
+    <div id="page-logs" class="page">
+      <div class="filter-bar">
+        <select id="filtro-log-entidad" onchange="renderLogs()">
+          <option value="">Todas las secciones</option>
+          <option value="cliente">Clientes</option>
+          <option value="factura">Facturas</option>
+          <option value="abono">Abonos</option>
+          <option value="gasto">Gastos</option>
+          <option value="abono_gasto">Abonos a Gastos</option>
+        </select>
+        <select id="filtro-log-accion" onchange="renderLogs()">
+          <option value="">Todas las acciones</option>
+          <option value="crear">Crear</option>
+          <option value="editar">Editar</option>
+          <option value="eliminar">Eliminar</option>
+        </select>
+      </div>
+      <div class="card"><div class="table-wrap"><table>
+        <thead><tr><th>Fecha y Hora</th><th>Usuario</th><th>Acción</th><th>Sección</th><th>Detalle</th></tr></thead>
+        <tbody id="tabla-logs"></tbody>
       </table></div></div>
     </div>
 
@@ -445,7 +470,7 @@ function openModal(id){
 function closeModal(id){document.getElementById(id).classList.remove('open');}
 document.querySelectorAll('.modal-overlay').forEach(el=>{el.addEventListener('click',e=>{if(e.target===el)el.classList.remove('open');});});
 
-const TITLES={dashboard:'Dashboard',clientes:'Clientes',facturas:'Facturas',cobrar:'Cuentas por Cobrar',gastos:'Gastos y Pagos',pagar:'Cuentas por Pagar',iva:'Resumen IVA',usuarios:'Usuarios'};
+const TITLES={dashboard:'Dashboard',clientes:'Clientes',facturas:'Facturas',cobrar:'Cuentas por Cobrar',gastos:'Gastos y Pagos',pagar:'Cuentas por Pagar',iva:'Resumen IVA',logs:'Registro de Actividad',usuarios:'Usuarios'};
 function navigate(page){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
@@ -467,6 +492,7 @@ function renderPage(p){
   if(p==='pagar')renderPagar();
   if(p==='iva')renderIva();
   if(p==='usuarios')renderUsuarios();
+  if(p==='logs')renderLogs();
 }
 
 // DASHBOARD
@@ -534,6 +560,7 @@ async function guardarCliente(){
     closeModal('modal-cliente');
     ['c-nombre','c-nit','c-tel','c-ciudad','c-dir','c-notas'].forEach(id=>document.getElementById(id).value='');
     toast('Cliente guardado ✓');renderClientes();
+    log('crear','cliente',null,`Cliente: ${nombre}`);
   }catch(e){alert(e.message);}
 }
 function editarCliente(id){
@@ -555,11 +582,12 @@ async function guardarEdicionCliente(){
   try{
     await api('PUT',`/clientes/${id}`,{nombre,nit:document.getElementById('ec-nit').value.trim(),telefono:tel,ciudad:document.getElementById('ec-ciudad').value.trim(),direccion:document.getElementById('ec-dir').value.trim(),notas:document.getElementById('ec-notas').value.trim()});
     closeModal('modal-editar-cliente');toast('Cliente actualizado ✓');renderClientes();
+    log('editar','cliente',id,`Cliente: ${nombre}`);
   }catch(e){alert(e.message);}
 }
 async function eliminarCliente(id){
   if(!confirm('¿Eliminar cliente y todas sus facturas?'))return;
-  try{await api('DELETE',`/clientes/${id}`);toast('Eliminado');renderClientes();}catch(e){alert(e.message);}
+  try{await api('DELETE',`/clientes/${id}`);toast('Eliminado');renderClientes();log('eliminar','cliente',id,'Cliente eliminado');}catch(e){alert(e.message);}
 }
 async function verCliente(id){
   try{
@@ -703,6 +731,7 @@ async function guardarFactura(){
     ['f-desc','f-cantidad','f-precio','f-flete','f-subtotal','f-iva','f-total','f-abono','f-notas'].forEach(id=>document.getElementById(id).value='');
     document.getElementById('f-iva-pct').value='0';document.getElementById('f-estado').value='pendiente';
     toast('Factura guardada ✓');renderPage(document.querySelector('.page.active').id.replace('page-',''));
+    log('crear','factura',null,`Factura por ${fmt(total)} a cliente`);
   }catch(e){alert(e.message);}
 }
 async function editarFactura(id){
@@ -733,11 +762,12 @@ async function guardarEdicionFactura(){
   try{
     await api('PUT',`/facturas/${id}`,{cliente_id,fecha,descripcion:document.getElementById('ef-desc').value,cantidad:document.getElementById('ef-cantidad').value,precio_unitario:document.getElementById('ef-precio').value,flete:document.getElementById('ef-flete').value||0,subtotal:document.getElementById('ef-subtotal').value||0,iva_pct:document.getElementById('ef-iva-pct').value||0,iva:document.getElementById('ef-iva').value||0,total,notas:document.getElementById('ef-notas').value});
     closeModal('modal-editar-factura');toast('Factura actualizada ✓');renderPage(document.querySelector('.page.active').id.replace('page-',''));
+    log('editar','factura',id,`Factura editada, total: ${fmt(total)}`);
   }catch(e){alert(e.message);}
 }
 async function eliminarFactura(id){
   if(!confirm('¿Eliminar esta factura?'))return;
-  try{await api('DELETE',`/facturas/${id}`);toast('Eliminado');renderPage(document.querySelector('.page.active').id.replace('page-',''));}catch(e){alert(e.message);}
+  try{await api('DELETE',`/facturas/${id}`);toast('Eliminado');renderPage(document.querySelector('.page.active').id.replace('page-',''));log('eliminar','factura',id,'Factura eliminada');}catch(e){alert(e.message);}
 }
 
 // ABONOS FACTURAS
@@ -759,6 +789,7 @@ async function guardarAbono(){
     const p=document.querySelector('.page.active').id.replace('page-','');
     renderPage(p);
     if(_currentClienteId)verCliente(_currentClienteId);
+    log('crear','abono',fid,`Abono de ${fmt(monto)} a factura`);
   }catch(e){alert(e.message);}
 }
 
@@ -852,6 +883,8 @@ async function renderGastos(){
         <td class="text-right text-mono">${fmt(monto)}</td>
         <td class="text-right text-mono" style="color:var(--blue)">${iva>0?fmt(iva):'—'}</td>
         <td class="text-right text-mono fw500">${fmt(total)}</td>
+        <td class="text-right text-mono" style="color:var(--accent)">${abonado>0?fmt(abonado):'—'}</td>
+        <td class="text-right text-mono fw500" style="color:${g.estado==='pendiente'&&saldo>0?'var(--red)':'var(--text3)'}">${g.estado==='pendiente'?fmt(saldo):'—'}</td>
         <td><span class="badge ${badgeCls}">${badgeLbl}</span></td>
         <td style="display:flex;gap:5px;flex-wrap:wrap">
           ${g.estado==='pendiente'?`<button class="btn btn-sm btn-primary" onclick="openAbonoGasto(${g.id})">+ Abonar</button>`:''}
@@ -876,6 +909,7 @@ async function guardarGasto(){
     ['g-desc','g-monto','g-iva','g-total','g-prov'].forEach(id=>document.getElementById(id).value='');
     document.getElementById('g-iva-pct').value='0';
     toast('Gasto guardado ✓');renderPage(document.querySelector('.page.active').id.replace('page-',''));
+    log('crear','gasto',null,`${document.getElementById('g-cat').value||''} — ${fmt(monto+parseFloat(document.getElementById('g-iva').value||0))}`);
   }catch(e){alert(e.message);}
 }
 function editarGasto(id){
@@ -901,14 +935,15 @@ async function guardarEdicionGasto(){
   try{
     await api('PUT',`/gastos/${id}`,{categoria:document.getElementById('eg-cat').value,fecha,descripcion:document.getElementById('eg-desc').value,monto,iva_pct:document.getElementById('eg-iva-pct').value||0,iva:document.getElementById('eg-iva').value||0,total:document.getElementById('eg-total').value||monto,proveedor:document.getElementById('eg-prov').value,estado:document.getElementById('eg-estado').value,metodo_pago:document.getElementById('eg-metodo').value});
     closeModal('modal-editar-gasto');toast('Gasto actualizado ✓');renderPage(document.querySelector('.page.active').id.replace('page-',''));
+    log('editar','gasto',id,`Gasto editado`);
   }catch(e){alert(e.message);}
 }
 async function pagarGasto(id){
-  try{await api('PUT',`/gastos/${id}/pagar`);toast('Marcado como pagado ✓');renderPage(document.querySelector('.page.active').id.replace('page-',''));}catch(e){alert(e.message);}
+  try{await api('PUT',`/gastos/${id}/pagar`);toast('Marcado como pagado ✓');renderPage(document.querySelector('.page.active').id.replace('page-',''));log('editar','gasto',id,'Marcado como pagado');}catch(e){alert(e.message);}
 }
 async function eliminarGasto(id){
   if(!confirm('¿Eliminar este gasto?'))return;
-  try{await api('DELETE',`/gastos/${id}`);toast('Eliminado');renderPage(document.querySelector('.page.active').id.replace('page-',''));}catch(e){alert(e.message);}
+  try{await api('DELETE',`/gastos/${id}`);toast('Eliminado');renderPage(document.querySelector('.page.active').id.replace('page-',''));log('eliminar','gasto',id,'Gasto eliminado');}catch(e){alert(e.message);}
 }
 
 // ABONOS GASTOS
@@ -928,6 +963,7 @@ async function guardarAbonoGasto(){
     await api('POST','/abonos-gastos',{gasto_id,monto,fecha,notas:document.getElementById('ag-notas').value});
     closeModal('modal-abono-gasto');toast('Abono registrado ✓');
     renderPage(document.querySelector('.page.active').id.replace('page-',''));
+    log('crear','abono_gasto',gasto_id,`Abono de ${fmt(monto)} a gasto`);
   }catch(e){alert(e.message);}
 }
 
@@ -991,6 +1027,41 @@ async function renderUsuarios(){
 async function eliminarUsuario(id){
   if(!confirm('¿Eliminar este usuario?'))return;
   try{await api('DELETE',`/usuarios/${id}`);toast('Eliminado');renderUsuarios();}catch(e){alert(e.message);}
+}
+
+// LOG HELPER
+async function log(accion,entidad,entidad_id,detalle){
+  try{await api('POST','/logs',{accion,entidad,entidad_id:entidad_id?.toString(),detalle});}
+  catch(e){console.warn('Log:',e.message);}
+}
+
+// LOGS
+let _logsCache=[];
+async function renderLogs(){
+  try{
+    _logsCache=await api('GET','/logs');
+    const filtroEntidad=(document.getElementById('filtro-log-entidad')||{value:''}).value;
+    const filtroAccion=(document.getElementById('filtro-log-accion')||{value:''}).value;
+    let list=_logsCache.filter(l=>{
+      let ok=true;
+      if(filtroEntidad)ok=ok&&l.entidad===filtroEntidad;
+      if(filtroAccion)ok=ok&&l.accion===filtroAccion;
+      return ok;
+    });
+    const ABADGE={crear:'badge-green',editar:'badge-blue',eliminar:'badge-red'};
+    const ELBL={cliente:'Cliente',factura:'Factura',abono:'Abono',gasto:'Gasto',abono_gasto:'Abono a Gasto'};
+    const tbody=document.getElementById('tabla-logs');
+    tbody.innerHTML=list.length?list.map(l=>{
+      const fecha=new Date(l.creado_en).toLocaleString('es-CO',{timeZone:'America/Bogota',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+      return `<tr>
+        <td class="text-mono" style="font-size:12px;color:var(--text2)">${fecha}</td>
+        <td class="fw500">${l.usuario_nombre||'—'}</td>
+        <td><span class="badge ${ABADGE[l.accion]||'badge-gray'}">${l.accion}</span></td>
+        <td><span class="badge badge-gray">${ELBL[l.entidad]||l.entidad}</span></td>
+        <td style="font-size:12px;color:var(--text2);max-width:300px">${l.detalle||'—'}</td>
+      </tr>`;
+    }).join(''):'<tr><td colspan="5"><div class="empty">No hay actividad registrada</div></td></tr>';
+  }catch(e){console.error(e);}
 }
 
 renderDashboard();
